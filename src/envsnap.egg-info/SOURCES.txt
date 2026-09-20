@@ -20,6 +20,8 @@ tests/test_detect_rich.py
 tests/test_pack.py
 tests/test_restore.py
 tests/test_restore_full.py
+tests/test_secrets.py
+tests/test_selfskip.py
 tests/test_setupgen.py
 tests/test_share.py
 tests/test_wizard_save.py
