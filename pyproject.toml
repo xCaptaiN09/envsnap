@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+[project]
+name = "envsnap"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["click>=8", "rich>=13"]
+[project.scripts]
+envsnap = "envsnap.cli:main"
+[tool.setuptools.packages.find]
+where = ["src"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
