@@ -2,6 +2,8 @@ import json
 import os
 import platform
 import re
+import shutil
+import subprocess
 import sys
 
 SECRET_RE = re.compile(
@@ -29,21 +31,64 @@ def _ignore_globs(root: str) -> list:
     return out
 
 
+def _node_version() -> str | None:
+    if not shutil.which("node"):
+        return None
+    try:
+        return subprocess.check_output(["node", "--version"], text=True, timeout=5).strip()
+    except Exception:
+        return None
+
+
+def _pip_packages(root: str, limit: int = 50) -> list:
+    req = os.path.join(root, "requirements.txt")
+    if os.path.exists(req):
+        out = []
+        with open(req) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    out.append(line)
+        return out[:limit]
+    try:
+        txt = subprocess.check_output(
+            [sys.executable, "-m", "pip", "freeze"], text=True, timeout=15
+        )
+        return [l.strip() for l in txt.splitlines() if l.strip()][:limit]
+    except Exception:
+        return []
+
+
+def _os_detail() -> str:
+    try:
+        with open("/etc/os-release") as f:
+            for line in f:
+                if line.startswith("PRETTY_NAME="):
+                    return line.split("=", 1)[1].strip().strip('"')
+    except Exception:
+        pass
+    return f"{platform.system()} {platform.release()}"
+
+
 def detect_project(root: str) -> dict:
     files = set(os.listdir(root))
     py = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     node = None
+    node_version = _node_version()
     run = None
     if "package.json" in files:
         try:
             with open(os.path.join(root, "package.json")) as f:
                 pkg = json.load(f)
-            run = (pkg.get("scripts") or {}).get("dev")
+            scripts = pkg.get("scripts") or {}
+            run = scripts.get("dev") or scripts.get("start")
         except Exception:
             run = None
-        node = "18"
-    if "app.py" in files and not run:
-        run = "python app.py"
+        node = node_version or "18"
+    for cand in ("app.py", "main.py", "server.py", "manage.py"):
+        if cand in files and not run:
+            run = f"python {cand}"
+            break
     env_template: list = []
     env_path = os.path.join(root, ".env")
     if os.path.exists(env_path):
@@ -59,9 +104,12 @@ def detect_project(root: str) -> dict:
                 # Caller (pack) must refuse secret values; detect only lists keys.
     return {
         "os": platform.system(),
+        "os_detail": _os_detail(),
         "arch": platform.machine(),
         "python": py,
+        "pip_packages": _pip_packages(root),
         "node": node,
+        "node_version": node_version,
         "run": run or "python app.py",
         "env_template": env_template,
         "ignores": _ignore_globs(root),
