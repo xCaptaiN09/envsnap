@@ -89,6 +89,7 @@ def detect_project(root: str) -> dict:
         if cand in files and not run:
             run = f"python {cand}"
             break
+    python_has_app = any(c in files for c in ("app.py", "main.py", "server.py", "manage.py"))
     env_template: list = []
     env_path = os.path.join(root, ".env")
     if os.path.exists(env_path):
@@ -111,6 +112,7 @@ def detect_project(root: str) -> dict:
         "node": node,
         "node_version": node_version,
         "run": run or "python app.py",
+        "python_has_app": python_has_app,
         "env_template": env_template,
         "ignores": _ignore_globs(root),
     }

@@ -80,6 +80,8 @@ def save_snapshot(root: str, out: str, on_secret: str = "ask") -> str:
         globs = globs + hard
     elif hard:
         raise ValueError(f"refusing to pack secret in {hard[0]}")
+    out_abs = os.path.abspath(out)
+    out_rel = os.path.relpath(out_abs, os.path.abspath(root)) if out_abs.startswith(os.path.abspath(root) + os.sep) else None
     with tarfile.open(out, "w:gz") as t:
         b = json.dumps(m, indent=2).encode()
         ti = tarfile.TarInfo("manifest.json")
@@ -88,10 +90,15 @@ def save_snapshot(root: str, out: str, on_secret: str = "ask") -> str:
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w:gz") as c:
             for dp, dn, fn in os.walk(root):
+                # never recurse into prior restores
+                if "restored-app" in dn:
+                    dn.remove("restored-app")
                 dn[:] = [d for d in dn if d not in SKIP_DIRS]
                 for f in fn:
                     p = os.path.join(dp, f)
                     rel = os.path.relpath(p, root)
+                    if rel == out_rel or rel.endswith(".envsnap"):
+                        continue
                     if _should_skip(rel, globs):
                         continue
                     if rel in hard and on_secret == "skip":
