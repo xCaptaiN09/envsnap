@@ -13,10 +13,22 @@ def _norm_out(name: str) -> str:
     return f"{name}.envsnap"
 
 
-@click.group(invoke_without_command=True)
+CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
+
+
+@click.group(invoke_without_command=True, context_settings=CONTEXT_SETTINGS)
+@click.version_option(
+    package_name="envsnap",
+    prog_name="envsnap",
+    message="%(prog)s %(version)s",
+    help="Show version.",
+)
+@click.option("-v", "--verbose", is_flag=True, help="Verbose output.")
 @click.pass_context
-def main(ctx):
+def main(ctx, verbose):
     """Snapshot any dev env into one file."""
+    ctx.ensure_object(dict)
+    ctx.obj["verbose"] = verbose
     if ctx.invoked_subcommand is None:
         rprint("[bold]envsnap[/] — save / open / share")
         rprint("  envsnap save")
