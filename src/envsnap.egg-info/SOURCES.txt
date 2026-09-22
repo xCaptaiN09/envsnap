@@ -7,6 +7,7 @@ src/envsnap/detect.py
 src/envsnap/pack.py
 src/envsnap/restore.py
 src/envsnap/setupgen.py
+src/envsnap/share.py
 src/envsnap.egg-info/PKG-INFO
 src/envsnap.egg-info/SOURCES.txt
 src/envsnap.egg-info/dependency_links.txt
@@ -17,6 +18,7 @@ tests/test_ai.py
 tests/test_cli.py
 tests/test_detect.py
 tests/test_detect_rich.py
+tests/test_open_url.py
 tests/test_pack.py
 tests/test_restore.py
 tests/test_restore_full.py
@@ -24,4 +26,5 @@ tests/test_secrets.py
 tests/test_selfskip.py
 tests/test_setupgen.py
 tests/test_share.py
+tests/test_share_serve.py
 tests/test_wizard_save.py
