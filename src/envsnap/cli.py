@@ -76,13 +76,21 @@ def save(out, yes, allow_secrets):
 @click.option("--yes", is_flag=True, help="Non-interactive.")
 @click.option("--docker", is_flag=True, help="Show Docker fallback.")
 def open_cmd(path, yes, docker):
-    """Restore a snapshot."""
+    """Restore a snapshot (file or http(s) link)."""
     import getpass
     import os
+    import tempfile
+    import urllib.request
 
     from .restore import inspect_snapshot, restore_full
 
-    m = inspect_snapshot(path)
+    local = path
+    if path.startswith("http://") or path.startswith("https://"):
+        rprint("[cyan]Downloading snapshot...[/]")
+        fd, local = tempfile.mkstemp(suffix=".envsnap")
+        os.close(fd)
+        urllib.request.urlretrieve(path, local)
+    m = inspect_snapshot(local)
     rprint(f"[green]✔ Manifest:[/] py={m.get('python')} node={m.get('node')} run={m.get('run')}")
     vals: dict = {}
     for k in m.get("env_template", []):
@@ -91,7 +99,7 @@ def open_cmd(path, yes, docker):
         else:
             vals[k] = getpass.getpass(f"Enter {k} (kept private): ")
     dest = os.path.join(os.getcwd(), "restored-app")
-    r = restore_full(path, dest)
+    r = restore_full(local, dest)
     rprint(f"[green]✔ Restored → {r['dir']}[/] — next: cd {r['dir']} && ./setup.sh")
     if docker:
         rprint("[yellow]Docker fallback:[/] docker build -t envsnap-app . && docker run -p 8000:8000 envsnap-app")
@@ -99,10 +107,54 @@ def open_cmd(path, yes, docker):
 
 @main.command()
 @click.argument("path", required=False)
-def share(path):
-    """Share via temp link (V0 stub)."""
-    rprint("[yellow]V0:[/] send the .envsnap file directly (Telegram/Drive).")
-    rprint("Relay temp links land in V0.2 — direct P2P first.")
-    if path:
-        rprint(f"File: {path}")
+@click.option("--port", default=8765, show_default=True)
+@click.option("--relay", is_flag=True, help="Try Cloudflare tunnel for NAT (needs cloudflared).")
+def share(path, port, relay):
+    """Share via temp sender-hosted link. Ctrl+C kills it."""
+    import os
+    import shutil
+    import subprocess
+
+    from .share import lan_ip, serve_file
+
+    if not path:
+        cands = [f for f in os.listdir(".") if f.endswith(".envsnap")]
+        if len(cands) == 1:
+            path = cands[0]
+        elif not cands:
+            rprint("[red]No .envsnap file here — run envsnap save first.[/]")
+            return
+        else:
+            rprint(f"Found: {', '.join(cands)}")
+            path = click.prompt("Which file", default=cands[0])
+    srv, actual, token = serve_file(path, port=port)
+    ip = lan_ip()
+    url = f"http://{ip}:{actual}/{token}"
+    rprint(f"[green]✔ Sharing {path}[/] — keep this terminal open, Ctrl+C to kill")
+    rprint(f"  Friend runs: [bold]envsnap open {url}[/]")
+    if relay:
+        if not shutil.which("cloudflared"):
+            rprint("[yellow]cloudflared not found — sharing on LAN only. Install cloudflared for far-away relay.[/]")
+        else:
+            p = subprocess.Popen(
+                ["cloudflared", "tunnel", "--url", f"http://127.0.0.1:{actual}"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            try:
+                for line in p.stdout or []:
+                    if "trycloudflare.com" in line:
+                        import re
+
+                        m = re.search(r"https://[^\s]*trycloudflare\.com", line)
+                        if m:
+                            rprint(f"  Relay (far-away): [bold]envsnap open {m.group(0)}/{token}[/]")
+                            break
+            finally:
+                pass  # relay proc dies with Ctrl+C below
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        rprint("\n[red]Link dead.[/]")
 
