@@ -2,7 +2,7 @@
 requires = ["setuptools>=61"]
 [project]
 name = "envsnap"
-version = "0.1.3"
+version = "0.1.4"
 requires-python = ">=3.10"
 dependencies = ["click>=8", "rich>=13"]
 [project.scripts]

@@ -89,7 +89,13 @@ def open_cmd(path, yes, docker):
         rprint("[cyan]Downloading snapshot...[/]")
         fd, local = tempfile.mkstemp(suffix=".envsnap")
         os.close(fd)
-        urllib.request.urlretrieve(path, local)
+        try:
+            urllib.request.urlretrieve(path, local)
+        except Exception as e:
+            rprint(f"[red]Can't reach sender:[/] {e}")
+            rprint("Sender closed terminal (link dead?) or you're on different network.")
+            rprint("Ask sender to run share again, or get the .envsnap file directly.")
+            raise SystemExit(1)
     m = inspect_snapshot(local)
     rprint(f"[green]✔ Manifest:[/] py={m.get('python')} node={m.get('node')} run={m.get('run')}")
     vals: dict = {}

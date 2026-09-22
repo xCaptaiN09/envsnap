@@ -81,7 +81,7 @@ def detect_project(root: str) -> dict:
             with open(os.path.join(root, "package.json")) as f:
                 pkg = json.load(f)
             scripts = pkg.get("scripts") or {}
-            run = scripts.get("dev") or scripts.get("start")
+            run = scripts.get("dev") or scripts.get("start") or scripts.get("test")
         except Exception:
             run = None
         node = node_version or "18"
