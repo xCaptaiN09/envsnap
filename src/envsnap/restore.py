@@ -23,6 +23,29 @@ def restore_dry(path: str, dest: str) -> dict:
     return {"ok": True, "run": m.get("run")}
 
 
+def snapshot_size(path: str) -> int:
+    import os
+
+    return os.path.getsize(path)
+
+
+def list_snapshot_files(path: str) -> list:
+    """Return [(name, size)] of code files inside .envsnap. Read-only."""
+    import io
+
+    with tarfile.open(path) as t:
+        c = t.extractfile("code.tar.gz")
+        assert c is not None
+        data = c.read()
+    buf = io.BytesIO(data)
+    out = []
+    with tarfile.open(fileobj=buf) as inner:
+        for m in inner.getmembers():
+            if m.isfile():
+                out.append((m.name, m.size))
+    return sorted(out)
+
+
 def restore_full(path: str, dest: str) -> dict:
     """Extract all code files + write setup.sh. No secrets ever written."""
     from .setupgen import generate_setup

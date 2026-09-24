@@ -41,22 +41,23 @@ def _node_version() -> str | None:
 
 
 def _pip_packages(root: str, limit: int = 50) -> list:
-    req = os.path.join(root, "requirements.txt")
-    if os.path.exists(req):
-        out = []
-        with open(req) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    out.append(line)
-        return out[:limit]
-    try:
-        txt = subprocess.check_output(
-            [sys.executable, "-m", "pip", "freeze"], text=True, timeout=15
-        )
-        return [l.strip() for l in txt.splitlines() if l.strip()][:limit]
-    except Exception:
-        return []
+    # Only project-pinned deps — never global `pip freeze` (noisy, misleading).
+    for name in ("requirements.txt", "requirements.in", "pyproject.toml"):
+        req = os.path.join(root, name)
+        if os.path.exists(req):
+            out = []
+            with open(req) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        # pyproject: only grab lines that look like pins
+                        if name == "pyproject.toml" and not any(
+                            c in line for c in ("==", ">=", "~=", "!=")
+                        ):
+                            continue
+                        out.append(line.strip('",'))
+            return out[:limit]
+    return []
 
 
 def _os_detail() -> str:

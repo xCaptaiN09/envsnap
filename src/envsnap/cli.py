@@ -124,6 +124,105 @@ def open_cmd(path, yes, docker):
 
 
 @main.command()
+@click.argument("path")
+def inspect(path):
+    """Show everything inside a snapshot — no extraction."""
+    import os
+
+    from rich.table import Table
+    from rich.tree import Tree
+
+    from .doctor import detect_manager, plan_missing
+    from .restore import inspect_snapshot, list_snapshot_files, snapshot_size
+
+    m = inspect_snapshot(path)
+    size = snapshot_size(path)
+    rprint(f"[bold]{os.path.basename(path)}[/] ({size // 1024} KB)")
+    t = Table(show_header=True, header_style="bold")
+    t.add_column("Field")
+    t.add_column("Value")
+    t.add_row("OS", f"{m.get('os_detail') or m.get('os')} / {m.get('arch')}")
+    t.add_row("Python", str(m.get("python")))
+    t.add_row("Node", str(m.get("node_version") or m.get("node")))
+    t.add_row("Run", str(m.get("run")))
+    t.add_row("Env keys", ", ".join(m.get("env_template") or ["(none)"]))
+    if m.get("pip_packages"):
+        t.add_row("pip (first 5)", ", ".join(m["pip_packages"][:5]))
+    rprint(t)
+    # what will be installed here
+    plan = plan_missing(m)
+    mgr = detect_manager()
+    rprint(f"[bold]On this machine[/] (pkg manager: {mgr or 'none found'}):")
+    if not plan:
+        rprint("  [green]✔ nothing missing — ready to run[/]")
+    else:
+        for p in plan:
+            rprint(f"  [yellow]✘ {p['name']}[/] (have: {p['have']}) — will ask to install")
+    # full tree
+    tree = Tree(f"[bold]{os.path.basename(path)}[/] files")
+    for name, sz in list_snapshot_files(path):
+        tree.add(f"{name} ({sz // 1024} KB)" if sz >= 1024 else f"{name} ({sz} B)")
+    rprint(tree)
+
+
+@main.command(name="run")
+@click.argument("path")
+@click.option("--yes", is_flag=True, help="Auto-yes to all installs.")
+def run_cmd(path, yes):
+    """Extract + auto-install missing deps (Y/n each) + launch. The magic one."""
+    import getpass
+    import os
+    import tempfile
+    import urllib.request
+
+    from .doctor import detect_manager, install_cmd, plan_missing, run_cmd as sh
+    from .restore import inspect_snapshot, restore_full
+
+    local = path
+    if path.startswith("http://") or path.startswith("https://"):
+        rprint("[cyan]Downloading snapshot...[/]")
+        fd, local = tempfile.mkstemp(suffix=".envsnap")
+        os.close(fd)
+        try:
+            urllib.request.urlretrieve(path, local)
+        except Exception as e:
+            rprint(f"[red]Can't reach sender:[/] {e}")
+            raise SystemExit(1)
+    m = inspect_snapshot(local)
+    mgr = detect_manager()
+    rprint(f"[green]✔ Snapshot:[/] py={m.get('python')} node={m.get('node')} run={m.get('run')}")
+    rprint(f"Package manager: [bold]{mgr or 'none found — manual install needed'}[/]")
+    for k in m.get("env_template", []):
+        if not yes:
+            getpass.getpass(f"Enter {k} (kept private, Enter to skip): ")
+    dest = os.path.join(os.getcwd(), "restored-app")
+    r = restore_full(local, dest)
+    plan = plan_missing(m)
+    if plan and not mgr:
+        rprint("[yellow]Missing deps but no package manager found — open setup.sh manually.[/]")
+    for item in plan:
+        name = item["name"]
+        if item["kind"] == "pip":
+            cmd = f"pip install {item['want']}"
+        else:
+            cmd = install_cmd(mgr, name.split()[-1])
+        if not yes:
+            ok = click.confirm(f"Install {name}? [{cmd}]", default=True)
+            if not ok:
+                rprint(f"  skipped {name}")
+                continue
+        else:
+            rprint(f"Installing {name}...")
+        code, out = sh(cmd)
+        rprint(f"  {'[green]✔[/]' if code == 0 else '[red]✘ failed[/]'} {name}")
+        if code != 0 and not yes:
+            rprint(out[-500:])
+    rprint(f"[green]✔ Ready → {r['dir']}[/] — launching: {m.get('run')}")
+    os.chdir(r["dir"])
+    os.system(m.get("run") or "bash setup.sh")
+
+
+@main.command()
 @click.argument("path", required=False)
 @click.option("--port", default=8765, show_default=True)
 @click.option("--relay", is_flag=True, help="Try Cloudflare tunnel for NAT (needs cloudflared).")
