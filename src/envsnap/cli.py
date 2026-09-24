@@ -30,10 +30,14 @@ def main(ctx, verbose):
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
     if ctx.invoked_subcommand is None:
-        rprint("[bold]envsnap[/] — save / open / share")
-        rprint("  envsnap save")
-        rprint("  envsnap open <file>")
-        rprint("  envsnap share <file>")
+        rprint("[bold]envsnap[/] — snapshot any dev env, run it anywhere")
+        rprint("  envsnap save                 snapshot this project")
+        rprint("  envsnap open <file|url|code> restore it (safe, no install)")
+        rprint("  envsnap run <file|url>       restore + auto-install + launch")
+        rprint("  envsnap share [file]         temp LAN link (Ctrl+C kills)")
+        rprint("  envsnap share [file] --air   beam anywhere via code")
+        rprint("  envsnap inspect <file>       full details + tree, no extract")
+        rprint("  envsnap -h / --version / -v  help / version / verbose")
 
 
 @main.command()
@@ -108,6 +112,31 @@ def open_cmd(path, yes, docker):
             rprint("Sender closed terminal (link dead?) or you're on different network.")
             rprint("Ask sender to run share again, or get the .envsnap file directly.")
             raise SystemExit(1)
+    else:
+        from .beam import is_code
+
+        if is_code(path):
+            from .beam import recv_file
+
+            rprint("[cyan]Receiving over Air...[/]")
+            fd, local = tempfile.mkstemp(suffix=".envsnap")
+            os.close(fd)
+            os.remove(local)
+            recv_file(path, dest_dir=tempfile.gettempdir())
+            # wormhole saves with original filename into cwd — find newest .envsnap
+            import glob
+            import time
+
+            cands = sorted(
+                glob.glob(os.path.join(tempfile.gettempdir(), "*.envsnap")),
+                key=os.path.getmtime,
+            )
+            if not cands or time.time() - os.path.getmtime(cands[-1]) > 300:
+                # fallback: cwd
+                cands = sorted(glob.glob("*.envsnap"), key=os.path.getmtime)
+                local = cands[-1] if cands else local
+            else:
+                local = cands[-1]
     m = inspect_snapshot(local)
     rprint(f"[green]✔ Manifest:[/] py={m.get('python')} node={m.get('node')} run={m.get('run')}")
     vals: dict = {}
@@ -226,8 +255,9 @@ def run_cmd(path, yes):
 @click.argument("path", required=False)
 @click.option("--port", default=8765, show_default=True)
 @click.option("--relay", is_flag=True, help="Try Cloudflare tunnel for NAT (needs cloudflared).")
-def share(path, port, relay):
-    """Share via temp sender-hosted link. Ctrl+C kills it."""
+@click.option("--air", is_flag=True, help="Beam anywhere via wormhole code (needs envsnap[air]).")
+def share(path, port, relay, air):
+    """Share via temp link (LAN) or --air code (anywhere). Ctrl+C kills it."""
     import os
     import shutil
     import subprocess
@@ -244,6 +274,13 @@ def share(path, port, relay):
         else:
             rprint(f"Found: {', '.join(cands)}")
             path = click.prompt("Which file", default=cands[0])
+    if air:
+        from .beam import send_file
+
+        rprint("[cyan]On Air — keep this terminal open, code expires after one receive.[/]")
+        code = send_file(path)
+        rprint(f"  Friend runs: [bold]envsnap open {code}[/]")
+        return
     srv, actual, token = serve_file(path, port=port)
     ip = lan_ip()
     url = f"http://{ip}:{actual}/{token}"
