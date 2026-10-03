@@ -2,7 +2,7 @@
 
 **Stop saying "works on my machine."**
 
-<video src="assets/demo.mp4" poster="assets/demo.jpg" controls muted loop playsinline width="100%"></video>
+[![Watch the demo](assets/demo.jpg)](assets/demo.mp4)
 
 One command to snapshot your entire dev environment. One command for anyone to run it *exactly* the same.
 
