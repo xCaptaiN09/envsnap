@@ -3,8 +3,8 @@
 **Stop saying "works on my machine."**
 
 <div align="center">
-  <video src="https://github.com/xCaptaiN09/envsnap/releases/download/v0.1.7/demo.mp4" controls="controls" width="720"></video>
-  <p><sub>▶️ <em>Watch the 20-second overview — save / share / run · <a href="https://github.com/xCaptaiN09/envsnap/releases/download/v0.1.7/demo.mp4">Open full video</a></em></sub></p>
+  <video src="https://github.com/user-attachments/assets/d680dcb4-fd9a-40a5-997b-648eb4205028" controls="controls" width="720"></video>
+  <p><sub>▶️ <em>Watch the 20-second overview — save / share / run · <a href="https://github.com/user-attachments/assets/d680dcb4-fd9a-40a5-997b-648eb4205028">Open full video</a></em></sub></p>
 </div>
 
 One command to snapshot your entire dev environment. One command for anyone to run it *exactly* the same.
