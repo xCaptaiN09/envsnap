@@ -2,7 +2,10 @@
 
 **Stop saying "works on my machine."**
 
-[![Watch the demo](assets/demo.jpg)](assets/demo.mp4)
+<div align="center">
+  <video src="https://github.com/xCaptaiN09/envsnap/releases/download/v0.1.7/demo.mp4" controls="controls" width="720"></video>
+  <p><sub>▶️ <em>Watch the 20-second overview — save / share / run · <a href="https://github.com/xCaptaiN09/envsnap/releases/download/v0.1.7/demo.mp4">Open full video</a></em></sub></p>
+</div>
 
 One command to snapshot your entire dev environment. One command for anyone to run it *exactly* the same.
 
